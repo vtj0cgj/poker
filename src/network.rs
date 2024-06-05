@@ -1,7 +1,7 @@
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use serde::{Serialize, Deserialize};
-use crate::game::{GameState, Player, GamePhase};
+use crate::game::{GameState, Player};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
@@ -77,5 +77,19 @@ pub async fn start_client(address: &str, name: String) {
     let message = Message::Join(name);
     let message = serde_json::to_vec(&message).unwrap();
     socket.write_all(&message).await.unwrap();
-    // Handle communication with the server.
+
+    // Client read loop to handle incoming messages and keep the connection alive.
+    let mut buffer = vec![0; 1024];
+
+    loop {
+        let n = socket.read(&mut buffer).await.unwrap();
+        if n == 0 {
+            break;
+        }
+
+        let message: Message = serde_json::from_slice(&buffer[..n]).unwrap();
+        println!("Received message: {:?}", message);
+
+        // Handle different types of messages here as needed.
+    }
 }
