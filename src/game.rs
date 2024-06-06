@@ -1,8 +1,77 @@
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
-use crate::deck::{Deck, Card};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GameState {
+    pub players: Vec<Player>,
+    pub deck: Deck,
+    pub current_bet: u64,
+    pub pot: u64,
+    pub phase: GamePhase,
+    pub dealer_position: usize,
+    pub current_player: usize,
+}
+
+impl GameState {
+    pub fn new() -> Self {
+        Self {
+            players: Vec::new(),
+            deck: Deck::new(),
+            current_bet: 0,
+            pot: 0,
+            phase: GamePhase::WaitingForPlayers,
+            dealer_position: 0,
+            current_player: 0,
+        }
+    }
+
+    pub fn add_player(&mut self, player: Player) {
+        self.players.push(player);
+    }
+
+    pub fn start_game(&mut self) {
+        self.phase = GamePhase::PreFlop;
+        self.deal_hands();
+    }
+
+    pub fn deal_hands(&mut self) {
+        self.deck.shuffle();
+        for player in &mut self.players {
+            player.hand.push(self.deck.draw_card());
+            player.hand.push(self.deck.draw_card());
+        }
+        self.current_player = (self.dealer_position + 1) % self.players.len();
+    }
+
+    pub fn place_bet(&mut self, player_id: usize, amount: u64) {
+        if let Some(player) = self.players.iter_mut().find(|p| p.id == player_id) {
+            if player.cash >= amount {
+                player.cash -= amount;
+                player.bet += amount;
+                self.pot += amount;
+                self.current_bet = self.current_bet.max(amount);
+                self.advance_to_next_player();
+            }
+        }
+    }
+
+    pub fn fold(&mut self, player_id: usize) {
+        if let Some(player) = self.players.iter_mut().find(|p| p.id == player_id) {
+            player.is_active = false;
+            self.advance_to_next_player();
+        }
+    }
+
+    pub fn advance_to_next_player(&mut self) {
+        loop {
+            self.current_player = (self.current_player + 1) % self.players.len();
+            if self.players[self.current_player].is_active {
+                break;
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Player {
     pub id: usize,
     pub name: String,
@@ -12,106 +81,45 @@ pub struct Player {
     pub is_active: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GameState {
-    pub players: HashMap<usize, Player>,
-    pub pot: u64,
-    pub deck: Deck,
-    pub community_cards: Vec<Card>,
-    pub current_bet: u64,
-    pub phase: GamePhase,
-    pub dealer_position: usize,
-    pub current_player: usize,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Deck {
+    cards: Vec<Card>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+impl Deck {
+    pub fn new() -> Self {
+        let mut deck = Deck { cards: Vec::with_capacity(52) };
+        for suit in &["Hearts", "Diamonds", "Clubs", "Spades"] {
+            for rank in 1..=13 {
+                deck.cards.push(Card { suit: suit.to_string(), rank });
+            }
+        }
+        deck
+    }
+
+    pub fn shuffle(&mut self) {
+        use rand::seq::SliceRandom;
+        let mut rng = rand::thread_rng();
+        self.cards.shuffle(&mut rng);
+    }
+
+    pub fn draw_card(&mut self) -> Card {
+        self.cards.pop().unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Card {
+    pub suit: String,
+    pub rank: u8,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum GamePhase {
+    WaitingForPlayers,
     PreFlop,
     Flop,
     Turn,
     River,
     Showdown,
-}
-
-impl GameState {
-    pub fn new() -> Self {
-        GameState {
-            players: HashMap::new(),
-            pot: 0,
-            deck: Deck::new(),
-            community_cards: Vec::new(),
-            current_bet: 0,
-            phase: GamePhase::PreFlop,
-            dealer_position: 0,
-            current_player: 0,
-        }
-    }
-
-    pub fn add_player(&mut self, player: Player) {
-        self.players.insert(player.id, player);
-    }
-
-    pub fn start_game(&mut self) {
-        self.deck.shuffle();
-        self.deal_hands();
-        self.phase = GamePhase::PreFlop;
-    }
-
-    pub fn deal_hands(&mut self) {
-        for player in self.players.values_mut() {
-            player.hand.push(self.deck.deal().unwrap());
-            player.hand.push(self.deck.deal().unwrap());
-        }
-    }
-
-    pub fn deal_community_cards(&mut self, count: usize) {
-        for _ in 0..count {
-            self.community_cards.push(self.deck.deal().unwrap());
-        }
-    }
-
-    pub fn next_phase(&mut self) {
-        match self.phase {
-            GamePhase::PreFlop => {
-                self.phase = GamePhase::Flop;
-                self.deal_community_cards(3);
-            }
-            GamePhase::Flop => {
-                self.phase = GamePhase::Turn;
-                self.deal_community_cards(1);
-            }
-            GamePhase::Turn => {
-                self.phase = GamePhase::River;
-                self.deal_community_cards(1);
-            }
-            GamePhase::River => {
-                self.phase = GamePhase::Showdown;
-            }
-            GamePhase::Showdown => {
-                // Determine winner and reset game or handle accordingly
-            }
-        }
-    }
-
-    pub fn place_bet(&mut self, player_id: usize, amount: u64) {
-        let player = self.players.get_mut(&player_id).unwrap();
-        player.cash -= amount;
-        player.bet += amount;
-        self.pot += amount;
-        self.current_bet = amount;
-        self.advance_turn();
-    }
-
-    pub fn fold(&mut self, player_id: usize) {
-        let player = self.players.get_mut(&player_id).unwrap();
-        player.is_active = false;
-        self.advance_turn();
-    }
-
-    fn advance_turn(&mut self) {
-        // Logic to advance the turn to the next active player
-        // Here you'd add code to find the next active player.
-    }
-
-    // Add method to determine winner at showdown
 }
