@@ -1,59 +1,52 @@
 use rand::seq::SliceRandom;
-use serde::{Serialize, Deserialize};
+use rand::thread_rng;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Suit {
-    Hearts,
-    Diamonds,
-    Clubs,
-    Spades,
+#[derive(Debug, Clone)]
+struct Card {
+    rank: String,
+    suit: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum Rank {
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-    Nine,
-    Ten,
-    Jack,
-    Queen,
-    King,
-    Ace,
+impl Card {
+    fn new(rank: &str, suit: &str) -> Card {
+        Card {
+            rank: rank.to_string(),
+            suit: suit.to_string(),
+        }
+    }
+
+    fn display(&self) -> String {
+        format!("{} of {}", self.rank, self.suit)
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Card {
-    pub rank: Rank,
-    pub suit: Suit,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Deck {
+struct Deck {
     cards: Vec<Card>,
 }
 
 impl Deck {
-    pub fn new() -> Self {
+    fn new() -> Deck {
+        let ranks = vec![
+            "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A",
+        ];
+        let suits = vec!["Hearts", "Diamonds", "Clubs", "Spades"];
         let mut cards = Vec::new();
-        for &suit in &[Suit::Hearts, Suit::Diamonds, Suit::Clubs, Suit::Spades] {
-            for &rank in &[Rank::Two, Rank::Three, Rank::Four, Rank::Five, Rank::Six, Rank::Seven, Rank::Eight, Rank::Nine, Rank::Ten, Rank::Jack, Rank::Queen, Rank::King, Rank::Ace] {
-                cards.push(Card { rank, suit });
+
+        for suit in &suits {
+            for rank in &ranks {
+                cards.push(Card::new(rank, suit));
             }
         }
+
         Deck { cards }
     }
 
-    pub fn shuffle(&mut self) {
-        let mut rng = rand::thread_rng();
+    fn shuffle(&mut self) {
+        let mut rng = thread_rng();
         self.cards.shuffle(&mut rng);
     }
 
-    pub fn deal(&mut self) -> Option<Card> {
+    fn deal(&mut self) -> Option<Card> {
         self.cards.pop()
     }
 }

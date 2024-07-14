@@ -1,38 +1,124 @@
-mod game;
-mod deck;
-mod network;
-
-use tokio::runtime::Runtime;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::env;
 
+#[derive(Debug, Clone)]
+struct Card {
+    rank: String,
+    suit: String,
+}
+
+impl Card {
+    fn new(rank: &str, suit: &str) -> Card {
+        Card {
+            rank: rank.to_string(),
+            suit: suit.to_string(),
+        }
+    }
+
+    fn display(&self) -> String {
+        format!("{} of {}", self.rank, self.suit)
+    }
+}
+
+struct Deck {
+    cards: Vec<Card>,
+}
+
+impl Deck {
+    fn new() -> Deck {
+        let ranks = vec![
+            "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A",
+        ];
+        let suits = vec!["Hearts", "Diamonds", "Clubs", "Spades"];
+        let mut cards = Vec::new();
+
+        for suit in &suits {
+            for rank in &ranks {
+                cards.push(Card::new(rank, suit));
+            }
+        }
+
+        Deck { cards }
+    }
+
+    fn shuffle(&mut self) {
+        let mut rng = thread_rng();
+        self.cards.shuffle(&mut rng);
+    }
+
+    fn deal(&mut self) -> Option<Card> {
+        self.cards.pop()
+    }
+}
+
+
+
+struct Player {
+    name: String,
+    hand: Vec<Card>,
+}
+
+impl Player {
+    fn new(name: &str) -> Player {
+        Player {
+            name: name.to_string(),
+            hand: Vec::new(),
+        }
+    }
+
+    fn add_card(&mut self, card: Card) {
+        self.hand.push(card);
+    }
+
+    fn show_hand(&self) {
+        for card in &self.hand {
+            println!("{}", card.display());
+        }
+    }
+}
+
+struct Game {
+    deck: Deck,
+    players: Vec<Player>,
+}
+
+impl Game {
+    fn new(player_names: Vec<&str>) -> Game {
+        let mut deck = Deck::new();
+        deck.shuffle();
+
+        let players = player_names
+            .into_iter()
+            .map(|name| Player::new(name))
+            .collect();
+
+        Game { deck, players }
+    }
+
+    fn deal_cards(&mut self, cards_per_player: usize) {
+        for _ in 0..cards_per_player {
+            for player in &mut self.players {
+                if let Some(card) = self.deck.deal() {
+                    player.add_card(card);
+                }
+            }
+        }
+    }
+
+    fn play(&mut self) {
+        self.deal_cards(2);
+        for player in &self.players {
+            println!("{}'s hand:", player.name);
+            player.show_hand();
+        }
+    }
+}
+
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut rt = Runtime::new().unwrap();
-
-    if args.len() < 2 {
-        eprintln!("Usage: {} [server|client] [options]", args[0]);
-        return;
-    }
-
-    match args[1].as_str() {
-        "server" => {
-            if args.len() != 3 {
-                eprintln!("Usage: {} server [starting_cash]", args[0]);
-                return;
-            }
-            let starting_cash: u64 = args[2].parse().unwrap();
-            rt.block_on(network::start_server("127.0.0.1:8080", starting_cash));
-        }
-        "client" => {
-            if args.len() != 3 {
-                eprintln!("Usage: {} client [name]", args[0]);
-                return;
-            }
-            let name = args[2].clone();
-            rt.block_on(network::start_client("127.0.0.1:8080", name));
-        }
-        _ => {
-            eprintln!("Unknown command: {}", args[1]);
-        }
-    }
+    let _args: Vec<String> = env::args().collect();
+    let player_names = vec!["Alice", "Bob"];
+    let mut game = Game::new(player_names);
+    game.play();
 }
