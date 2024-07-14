@@ -52,11 +52,31 @@ impl Deck {
     }
 }
 
+struct Dealer {
+    hand: Vec<Card>
+}
 
+impl Dealer {
+    fn new() -> Dealer {
+        Dealer {
+            hand: Vec::new(),
+        }
+    }
+
+    fn add_card(&mut self, card: Card) {
+        self.hand.push(card);
+    }
+
+    fn show_hand(&self) {
+        for card in &self.hand {
+            println!("{}", card.display());
+        }
+    }
+}
 
 struct Player {
     name: String,
-    hand: Vec<Card>,
+    hand: Vec<Card>
 }
 
 impl Player {
@@ -80,6 +100,7 @@ impl Player {
 
 struct Game {
     deck: Deck,
+    dealer: Dealer,
     players: Vec<Player>,
 }
 
@@ -88,12 +109,14 @@ impl Game {
         let mut deck = Deck::new();
         deck.shuffle();
 
+        let dealer = Dealer::new();
+
         let players = player_names
             .into_iter()
             .map(|name| Player::new(name))
             .collect();
 
-        Game { deck, players }
+        Game { deck, dealer, players }
     }
 
     fn deal_cards(&mut self, cards_per_player: usize) {
