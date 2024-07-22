@@ -119,6 +119,12 @@ impl Game {
         Game { deck, dealer, players }
     }
 
+    fn revealcard(&mut self) {
+        if let Some(card) = self.deck.deal() {
+            self.dealer.add_card(card);
+        }
+    }
+
     fn deal_cards(&mut self, cards_per_player: usize) {
         for _ in 0..cards_per_player {
             for player in &mut self.players {
@@ -135,6 +141,7 @@ impl Game {
             println!("{}'s hand:", player.name);
             player.show_hand();
         }
+        self.revealcard()
     }
 }
 
